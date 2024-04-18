@@ -15,7 +15,7 @@ from plugins.scripts.opensky.transformers import ActiveFlightsETL
 logger = logging.getLogger(__name__)
 
 
-@task(retries=3, retry_delay=timedelta(seconds=30))
+@task(retries=2, retry_delay=timedelta(seconds=30))
 def active_flights_report():
     logger.info("Starting Active Flights ETL task")
     s3_credentials = S3BucketConnector.get_credentials()

@@ -1,5 +1,12 @@
 import os
-from typing import NamedTuple
+from typing import NamedTuple, Union
+
+
+def to_int_or_none(value: str) -> Union[int, None]:
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 class CompleteFlightsColumns(NamedTuple):
@@ -21,10 +28,10 @@ class FlightTrajectories(NamedTuple):
 
 
 class Mongodb(NamedTuple):
-    HOST: str
-    PORT: int
-    USERNAME: str
-    PASSWORD: str
+    HOST: Union[str, None]
+    PORT: Union[int, None]
+    USERNAME: Union[str, None]
+    PASSWORD: Union[str, None]
 
 
 COMPLETE_FLIGHTS_COLUMNS = CompleteFlightsColumns()
@@ -33,8 +40,8 @@ FLIGHT_TRAJECTORIES = FlightTrajectories()
 FLIGHT_STATUS_COLUMN = "flight_status"
 
 MONGODB = Mongodb(
-    HOST=os.environ["MONGODB_HOST"],
-    PORT=int(os.environ["MONGODB_PORT"]),
-    USERNAME=os.environ["MONGODB_USERNAME"],
-    PASSWORD=os.environ["MONGODB_PASSWORD"],
+    HOST=os.getenv(key="MONGODB_HOST", default=None),
+    PORT=to_int_or_none(os.getenv(key="MONGODB_PORT", default="")),
+    USERNAME=os.getenv(key="MONGODB_USERNAME", default=None),
+    PASSWORD=os.getenv(key="MONGODB_PASSWORD", default=None),
 )

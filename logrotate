@@ -1,0 +1,8 @@
+/var/log/airflow/dag_processor_manager/*.log {
+  daily
+  rotate 7
+  compress
+  missingok
+  notifempty
+  copytruncate
+}

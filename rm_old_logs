@@ -1,0 +1,3 @@
+0 * * * * root find /var/log/airflow/dag_id*/* -maxdepth 0 -type d -ctime +3 | xargs rm -rf > /dev/stdout 2>&1
+0 * * * * root find /var/log/airflow/scheduler/* -maxdepth 0 -type d -ctime +3 | xargs rm -rf > /dev/stdout 2>&1
+# delete logs that are older than 3 days

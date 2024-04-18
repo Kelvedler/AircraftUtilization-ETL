@@ -6,6 +6,8 @@ import pymongo
 from pymongo.collection import Collection
 from pymongo.errors import CollectionInvalid
 
+from plugins.common.constants import all_fields_present
+from plugins.common.exceptions import InvalidCredentials
 from plugins.scripts.complete_flights.constants import (
     COMPLETE_FLIGHTS_COLUMNS,
     Mongodb as MongoCredentials,
@@ -20,6 +22,8 @@ class Flights(TypedDict):
 
 class AircraftUtilizationClient:
     def __init__(self, credentials: MongoCredentials) -> None:
+        if not all_fields_present(credentials):
+            raise InvalidCredentials("MongoDB credentials are not valid")
         client: pymongo.MongoClient = pymongo.MongoClient(
             host=credentials.HOST,
             port=credentials.PORT,

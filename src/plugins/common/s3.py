@@ -15,6 +15,7 @@ from plugins.common.constants import (
     S3_STS,
     S3RolesAnywhere,
     S3Sts,
+    all_fields_present,
 )
 from plugins.common.exceptions import InvalidCredentials
 
@@ -45,7 +46,7 @@ class S3BucketConnector:
     @_get_session.register
     @staticmethod
     def _(credentials: S3Sts) -> boto3.Session:
-        if credentials.ROLE_SESSION is None:
+        if not all_fields_present(credentials):
             raise InvalidCredentials("S3 sts credentials are not valid")
 
         role_credentials = boto3.client("sts").assume_role(
@@ -63,12 +64,7 @@ class S3BucketConnector:
     @_get_session.register
     @staticmethod
     def _(credentials: S3RolesAnywhere) -> boto3.Session:
-        if (
-            credentials.PROFILE_ARN is None
-            or credentials.TRUST_ANCHOR_ARN is None
-            or credentials.CERTIFICATE_PATH is None
-            or credentials.PRIVATE_KEY_PATH is None
-        ):
+        if not all_fields_present(credentials):
             raise InvalidCredentials("S3 rolesanywhere credentials are not valid")
 
         roles_anywhere_session = IAMRolesAnywhereSession(
