@@ -45,9 +45,9 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v4
         with:
-          tags: ${{ secrets.CONTAINER_IMAGE }}:${{ steps.extract_branch.outputs.branch }}-latest
+          tags: ${{ vars.CONTAINER_IMAGE }}:${{ steps.extract_branch.outputs.branch }}-latest
           pull: true
-          cache-from: ${{ secrets.CONTAINER_IMAGE }}:${{ steps.extract_branch.outputs.branch }}-latest
+          cache-from: ${{ vars.CONTAINER_IMAGE }}:${{ steps.extract_branch.outputs.branch }}-latest
           push: true
 
       - name: Trigger deploy
