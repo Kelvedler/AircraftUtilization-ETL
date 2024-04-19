@@ -30,7 +30,6 @@ jobs:
 
       - name: Test with unittest
         run: |
-          pip install unittest
           (cd src && python -m unittest)
 
       - name: Set up Buildx
