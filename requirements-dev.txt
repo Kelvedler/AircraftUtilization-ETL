@@ -1,4 +1,3 @@
 pandas-stubs==2.0.2.230605
 types-requests==2.31.0.20240311
 boto3-stubs==1.34.73
-moto==5.0.3
