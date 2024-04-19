@@ -24,6 +24,6 @@ COPY ./src /app
 
 RUN chmod +x docker-entrypoint.sh /etc/cron.d/airflow
 
-EXPOSE 8080
+EXPOSE 8000
 
 ENTRYPOINT ./docker-entrypoint.sh
