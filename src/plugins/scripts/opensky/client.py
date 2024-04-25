@@ -23,7 +23,6 @@ class OpenSkyClient:
         response = requests.get(url=url, headers=headers, timeout=5)
 
         rate_limit_remaining = response.headers.get("X-Rate-Limit-Remaining")
-        print(rate_limit_remaining)
         self._logger.info(f"Rate limit remaining: {rate_limit_remaining}")
 
         if response.status_code == requests.codes.ok:
