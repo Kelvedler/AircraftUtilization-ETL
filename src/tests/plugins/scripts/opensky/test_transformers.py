@@ -61,7 +61,8 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         self.s3_bucket = self.s3.Bucket(s3_credentials.BUCKET)
         self.s3_bucket_connection = S3BucketConnector(credentials=s3_credentials)
 
-        self.opensky_client = OpenSkyClient()
+        opensky_auth = "test"
+        self.opensky_client = OpenSkyClient(auth=opensky_auth)
         self.set_default_states_monkey()
         self.transformer = ActiveFlightsETL(
             s3_bucket=self.s3_bucket_connection, opensky_client=self.opensky_client

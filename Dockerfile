@@ -13,6 +13,7 @@ RUN mkdir -p /app/certs /app/airflow
 COPY ./constraints.txt /app/constraints.txt
 COPY ./requirements.txt /app/requirements.txt
 COPY ./airflow_webserver_config.py /app/airflow/webserver_config.py
+COPY ./supervisord.conf /etc/supervisor/conf.d/main.conf
 COPY ./logrotate /etc/logrotate.d/airflow
 COPY ./rm_old_logs /etc/cron.d/airflow
 
@@ -22,7 +23,8 @@ RUN pip install -r ./requirements.txt --constraint ./constraints.txt
 
 COPY ./src /app
 
-RUN chmod +x docker-entrypoint.sh /etc/cron.d/airflow
+RUN chmod 744 docker-entrypoint.sh 
+RUN chmod 644 /etc/cron.d/airflow /etc/logrotate.d/airflow
 
 EXPOSE 8000
 
