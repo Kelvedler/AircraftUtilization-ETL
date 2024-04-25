@@ -9,6 +9,7 @@ from plugins.scripts.complete_flights.constants import MONGODB
 from plugins.scripts.complete_flights.db import AircraftUtilizationClient
 from plugins.scripts.complete_flights.transformers import CompleteFlightsETL
 from plugins.scripts.opensky.client import OpenSkyClient
+from plugins.scripts.opensky.constants import OPENSKY_AUTH
 from plugins.scripts.opensky.transformers import ActiveFlightsETL
 
 
@@ -20,7 +21,7 @@ def active_flights_report():
     logger.info("Starting Active Flights ETL task")
     s3_credentials = S3BucketConnector.get_credentials()
     s3_bucket = S3BucketConnector(credentials=s3_credentials)
-    opensky_client = OpenSkyClient()
+    opensky_client = OpenSkyClient(auth=OPENSKY_AUTH)
     transformer = ActiveFlightsETL(s3_bucket=s3_bucket, opensky_client=opensky_client)
     transformer.etl()
     logger.info("Active Flights ETL task finished")

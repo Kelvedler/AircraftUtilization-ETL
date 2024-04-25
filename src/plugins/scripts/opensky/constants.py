@@ -1,3 +1,4 @@
+import os
 from typing import NamedTuple
 
 
@@ -22,3 +23,4 @@ class StatesColumns(NamedTuple):
 
 
 STATES_COLUMNS = StatesColumns()
+OPENSKY_AUTH = os.getenv(key="OPENSKY_AUTH", default=None)
