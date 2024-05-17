@@ -6,13 +6,11 @@ import pandas as pd
 from plugins.common.constants import (
     ACTIVE_FLIGHTS_COLUMNS,
     META_COLUMNS,
-    META_FILENAME,
     SOURCE_COLUMNS,
-    SOURCE_FILENAME,
 )
 from plugins.common.exceptions import InvalidResponseError, InvalidSource
 from plugins.common.s3 import S3BucketConnector
-from plugins.scripts.complete_flights.constants import COMPLETE_FLIGHTS_COLUMNS_V2
+from plugins.scripts.complete_flights.constants import COMPLETE_FLIGHTS_COLUMNS
 from plugins.scripts.opensky.client import OpenSkyClient
 from plugins.scripts.opensky.constants import STATES_COLUMNS
 
@@ -26,10 +24,14 @@ class ActiveFlightsETL:
     INACTIVITY_MAX_MINUTES = 20
 
     def __init__(
-        self, s3_bucket: S3BucketConnector, opensky_client: OpenSkyClient
+        self,
+        s3_bucket: S3BucketConnector,
+        opensky_client: OpenSkyClient,
+        source_filename: str,
     ) -> None:
         self.s3_bucket = s3_bucket
         self.opensky_client = opensky_client
+        self.source_filename = source_filename
         self._logger = logging.getLogger(__name__)
 
     def _extract_opensky_states(self) -> pd.DataFrame:
@@ -56,7 +58,7 @@ class ActiveFlightsETL:
         return states
 
     def _extract_latest_source(self) -> pd.DataFrame:
-        latest_source = self.s3_bucket.read_parquet(filename=SOURCE_FILENAME)
+        latest_source = self.s3_bucket.read_parquet(filename=self.source_filename)
         if latest_source.empty:
             latest_source = pd.DataFrame(columns=tuple(SOURCE_COLUMNS))
         elif not pd.Series(tuple(SOURCE_COLUMNS)).isin(latest_source.columns).all():
@@ -141,7 +143,7 @@ class ActiveFlightsETL:
 
     def _load(self, source: pd.DataFrame) -> None:
         self._logger.info("Uploading source report")
-        self.s3_bucket.upload_to_parquet(df=source, filename=SOURCE_FILENAME)
+        self.s3_bucket.upload_to_parquet(df=source, filename=self.source_filename)
 
     def etl(self) -> None:
         source_reports = self._extract()
@@ -151,10 +153,14 @@ class ActiveFlightsETL:
 
 class MetadataETL:
     def __init__(
-        self, s3_bucket: S3BucketConnector, opensky_client: OpenSkyClient
+        self,
+        s3_bucket: S3BucketConnector,
+        opensky_client: OpenSkyClient,
+        meta_filename: str,
     ) -> None:
         self._s3_bucket = s3_bucket
         self._opensky_client = opensky_client
+        self.meta_filename = meta_filename
         self._logger = logging.getLogger(__name__)
 
     def _extract(self) -> pd.DataFrame:
@@ -165,7 +171,7 @@ class MetadataETL:
     def _transform(self, source_metadata: pd.DataFrame) -> pd.DataFrame:
         self._logger.info("Performing Opensky metadata transformation")
         source_columns = META_COLUMNS
-        columns = COMPLETE_FLIGHTS_COLUMNS_V2
+        columns = COMPLETE_FLIGHTS_COLUMNS
         metadata = source_metadata[
             [
                 META_COLUMNS.ICAO24,
@@ -177,15 +183,14 @@ class MetadataETL:
                 META_COLUMNS.BUILT,
             ]
         ]
-        metadata.rename(
+        metadata = metadata.rename(
             columns={source_columns.MANUFACTURER_ICAO: columns.MANUFACTURER_ICAO},
-            inplace=True,
         )
         return metadata
 
     def _load(self, metadata: pd.DataFrame) -> None:
         self._logger.info("Uploading metadata")
-        self._s3_bucket.upload_to_parquet(df=metadata, filename=META_FILENAME)
+        self._s3_bucket.upload_to_parquet(df=metadata, filename=self.meta_filename)
 
     def etl(self) -> None:
         source_metadata = self._extract()

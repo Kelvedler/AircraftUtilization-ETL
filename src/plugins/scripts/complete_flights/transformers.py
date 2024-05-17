@@ -4,15 +4,13 @@ from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
-from plugins.common.constants import META_FILENAME, SOURCE_COLUMNS, SOURCE_FILENAME
+from plugins.common.constants import SOURCE_COLUMNS
 from plugins.common.s3 import S3BucketConnector
 from plugins.scripts.complete_flights.constants import (
     COMPLETE_FLIGHTS_COLUMNS,
-    COMPLETE_FLIGHTS_COLUMNS_V2,
     FLIGHT_STATUSES,
     FLIGHT_STATUS_COLUMN,
     FLIGHT_TRAJECTORIES,
-    MONGODB,
 )
 from plugins.scripts.complete_flights.db import AircraftUtilizationClient
 
@@ -24,10 +22,16 @@ class TransformedFlights(NamedTuple):
 
 class CompleteFlightsETL:
     def __init__(
-        self, s3_bucket: S3BucketConnector, db_client: AircraftUtilizationClient
+        self,
+        s3_bucket: S3BucketConnector,
+        db_client: AircraftUtilizationClient,
+        source_filename: str,
+        meta_filename: str,
     ) -> None:
         self.s3_bucket = s3_bucket
         self.db_client = db_client
+        self.source_filename = source_filename
+        self.meta_filename = meta_filename
         self._logger = logging.getLogger(__name__)
 
     def _is_takeoff(self, row: pd.Series) -> bool:
@@ -78,7 +82,7 @@ class CompleteFlightsETL:
 
     def _extract(self) -> pd.DataFrame:
         self._logger.info("Extracting source report")
-        source = self.s3_bucket.read_parquet(filename=SOURCE_FILENAME)
+        source = self.s3_bucket.read_parquet(filename=self.source_filename)
 
         return source
 
@@ -101,15 +105,18 @@ class CompleteFlightsETL:
         )
         return active
 
-    def _add_metadata(self, complete: pd.DataFrame) -> pd.DataFrame:
+    def _add_metadata(
+        self, complete: pd.DataFrame, metadata: pd.DataFrame
+    ) -> pd.DataFrame:
         self._logger.info("Adding metadata to complete flights")
-        columns = COMPLETE_FLIGHTS_COLUMNS_V2
-        metadata = self.s3_bucket.read_parquet(filename=META_FILENAME)
+        columns = COMPLETE_FLIGHTS_COLUMNS
         complete = complete.merge(right=metadata, on=columns.ICAO24, how="left")
         complete = complete.replace({np.nan: None})
         return complete
 
-    def _transform_complete(self, complete: pd.DataFrame) -> pd.DataFrame:
+    def _transform_complete(
+        self, complete: pd.DataFrame, metadata: pd.DataFrame
+    ) -> pd.DataFrame:
         valid_mask = complete[SOURCE_COLUMNS.TAKEOFF_AT] != 0
         complete = complete.loc[
             valid_mask,
@@ -136,11 +143,12 @@ class CompleteFlightsETL:
             axis=1,
             inplace=True,
         )
-        if MONGODB.DB == "aircraft-utilization-main":
-            complete = self._add_metadata(complete=complete)
+        complete = self._add_metadata(complete=complete, metadata=metadata)
         return complete
 
-    def _transform(self, source: pd.DataFrame) -> TransformedFlights:
+    def _transform(
+        self, source: pd.DataFrame, metadata: pd.DataFrame
+    ) -> TransformedFlights:
         self._logger.info("Performing report transformation")
         source[FLIGHT_STATUS_COLUMN] = source.apply(
             self._determine_flight_status, axis=1
@@ -150,22 +158,24 @@ class CompleteFlightsETL:
         complete_mask = source[FLIGHT_STATUS_COLUMN] == FLIGHT_STATUSES.LANDING
 
         active = self._transform_active(active=source.loc[active_mask])
-        complete = self._transform_complete(complete=source.loc[complete_mask])
+        complete = self._transform_complete(
+            complete=source.loc[complete_mask], metadata=metadata
+        )
 
         return TransformedFlights(active=active, complete=complete)
 
     def _load(self, flights: TransformedFlights) -> None:
         self._logger.info("Uploading reports")
-        self.s3_bucket.upload_to_parquet(df=flights.active, filename=SOURCE_FILENAME)
-        if MONGODB.DB == "aircraft-utilization-main":
-            self.db_client.write_flights_v2(df=flights.complete)
-        else:
-            self.db_client.write_flights(df=flights.complete)
+        self.s3_bucket.upload_to_parquet(
+            df=flights.active, filename=self.source_filename
+        )
+        self.db_client.write_flights(df=flights.complete)
 
     def etl(self) -> None:
         source = self._extract()
         if source.empty:
             self._logger.warning("Empty source report")
             return
-        flights = self._transform(source=source)
+        metadata = self.s3_bucket.read_parquet(filename=self.meta_filename)
+        flights = self._transform(source=source, metadata=metadata)
         self._load(flights=flights)

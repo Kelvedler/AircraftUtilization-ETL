@@ -1,3 +1,4 @@
+from datetime import date
 from io import BytesIO
 import unittest
 
@@ -41,8 +42,13 @@ class TestCompleteFlightsETLMethods(unittest.TestCase):
 
         db_client = AircraftUtilizationStub()
 
+        self.source_filename = "test-source"
+        self.meta_filename = "test-meta"
         self.transformer = CompleteFlightsETL(
-            s3_bucket=self.s3_bucket_connection, db_client=db_client
+            s3_bucket=self.s3_bucket_connection,
+            db_client=db_client,
+            source_filename=self.source_filename,
+            meta_filename=self.meta_filename,
         )
 
     def tearDown(self) -> None:
@@ -269,7 +275,7 @@ class TestCompleteFlightsETLMethods(unittest.TestCase):
         self.assertEqual(result, result_exp)
 
     def test_extract_ok(self) -> None:
-        key = "source.parquet"
+        key = f"{self.source_filename}.parquet"
         data_exp = {
             "icao24": ["65432a", "1b3456"],
             "last_contact": [1712338215, 0],
@@ -349,18 +355,36 @@ class TestCompleteFlightsETLMethods(unittest.TestCase):
             "is_first_contact": [False, False],
             "flight_status": ["landing", "landing"],
         }
+        metadata_data = {
+            "icao24": ["65432a", "12c456"],
+            "registration": ["AB-CDE", "BC-DEF"],
+            "model": ["Boeing 737", "Airbus 320"],
+            "manufacturer_icao": ["BOEING", "AIRBUS"],
+            "owner": ["Test Lease", "New Test Lease"],
+            "operator": ["Test Air", "New Test Air"],
+            "built": [date(year=2000, month=2, day=1), date(year=1990, month=3, day=5)],
+        }
+        metadata = pd.DataFrame(data=metadata_data)
         complte = pd.DataFrame(data=data)
         data_exp = {
             "icao24": ["65432a"],
             "flight_duration_minutes": 154,
             "landed_at": 1712338215,
+            "registration": "AB-CDE",
+            "model": "Boeing 737",
+            "manufacturer_icao": "BOEING",
+            "owner": "Test Lease",
+            "operator": "Test Air",
+            "built": date(year=2000, month=2, day=1),
         }
         result_exp = pd.DataFrame(data=data_exp)
         result_exp["landed_at"] = pd.to_datetime(
             result_exp["landed_at"], unit="s", utc=True
         )
 
-        result = self.transformer._transform_complete(complete=complte)
+        result = self.transformer._transform_complete(
+            complete=complte, metadata=metadata
+        )
 
         self.assertTrue(result.equals(result_exp))
 
