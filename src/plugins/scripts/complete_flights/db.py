@@ -2,26 +2,18 @@ import logging
 from typing import Optional, TypedDict
 
 import pandas as pd
-import pymongo
-from pymongo.collection import Collection
-from pymongo.errors import CollectionInvalid
-
 from plugins.common.constants import all_fields_present
 from plugins.common.exceptions import InvalidCredentials
 from plugins.scripts.complete_flights.constants import (
     COMPLETE_FLIGHTS_COLUMNS,
-    COMPLETE_FLIGHTS_COLUMNS_V2,
     Mongodb as MongoCredentials,
 )
+import pymongo
+from pymongo.collection import Collection
+from pymongo.errors import CollectionInvalid
 
 
 class Flights(TypedDict):
-    icao24: str
-    landed_at: int
-    duration_minutes: int
-
-
-class FlightsV2(TypedDict):
     icao24: str
     landed_at: int
     duration_minutes: int
@@ -65,24 +57,9 @@ class AircraftUtilizationClient:
 
     def write_flights(self, df: pd.DataFrame) -> None:
         flights = self._flights_collection()
+        columns = COMPLETE_FLIGHTS_COLUMNS
         documents = [
             Flights(
-                icao24=r[COMPLETE_FLIGHTS_COLUMNS.ICAO24],
-                landed_at=r[COMPLETE_FLIGHTS_COLUMNS.LANDED_AT],
-                duration_minutes=r[COMPLETE_FLIGHTS_COLUMNS.FLIGHT_DURATION_MINUTES],
-            )
-            for r in df.to_dict("records")
-        ]
-        if documents:
-            flights.insert_many(documents=documents)
-        else:
-            self._logger.info("Empty document. Nothing to write")
-
-    def write_flights_v2(self, df: pd.DataFrame) -> None:
-        flights = self._flights_collection()
-        columns = COMPLETE_FLIGHTS_COLUMNS_V2
-        documents = [
-            FlightsV2(
                 icao24=r[columns.ICAO24],
                 landed_at=r[columns.LANDED_AT],
                 duration_minutes=r[columns.FLIGHT_DURATION_MINUTES],

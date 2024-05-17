@@ -10,7 +10,11 @@ from plugins.common.constants import S3Sts
 from plugins.common.exceptions import InvalidResponseError, InvalidSource
 from plugins.common.s3 import S3BucketConnector
 from plugins.scripts.opensky.client import OpenSkyClient
-from plugins.scripts.opensky.transformers import ActiveFlightsETL, SourceReports
+from plugins.scripts.opensky.transformers import (
+    ActiveFlightsETL,
+    MetadataETL,
+    SourceReports,
+)
 
 
 class TestActiveFlightsETLMethods(unittest.TestCase):
@@ -62,10 +66,13 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         self.s3_bucket_connection = S3BucketConnector(credentials=s3_credentials)
 
         opensky_auth = "test"
+        self.source_filename = "test"
         self.opensky_client = OpenSkyClient(auth=opensky_auth)
         self.set_default_states_monkey()
         self.transformer = ActiveFlightsETL(
-            s3_bucket=self.s3_bucket_connection, opensky_client=self.opensky_client
+            s3_bucket=self.s3_bucket_connection,
+            opensky_client=self.opensky_client,
+            source_filename=self.source_filename,
         )
 
     def tearDown(self) -> None:
@@ -98,7 +105,7 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         self.set_default_states_monkey()
 
     def test_extract_latest_source_ok(self) -> None:
-        key = "source.parquet"
+        key = f"{self.source_filename}.parquet"
         data_exp = {
             "icao24": ["a23456", "65432a"],
             "last_contact": [1712338235, 1712338225],
@@ -121,7 +128,7 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         self.s3_bucket.delete_objects(Delete={"Objects": [{"Key": key}]})
 
     def test_extract_latest_source_invalid(self) -> None:
-        key = "source.parquet"
+        key = f"{self.source_filename}.parquet"
         data_exp = {
             "icao24": ["a23456", "65432a"],
             "last_contact": [1712338235, 1712338225],
@@ -273,7 +280,7 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         }
         states_exp = pd.DataFrame(data=states_data_exp)
 
-        key = "source.parquet"
+        key = f"{self.source_filename}.parquet"
         source_data_exp = {
             "icao24": ["a23456", "65432a"],
             "last_contact": [1712338235, 1712338225],
@@ -361,7 +368,7 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         self.assertTrue(result.equals(result_exp))
 
     def test_load_ok(self) -> None:
-        key = "source.parquet"
+        key = f"{self.source_filename}.parquet"
         source_data_exp = {
             "icao24": ["65432a", "12c456", "1b3456"],
             "last_contact": [1712338215, 1712338215, 0],
@@ -389,6 +396,150 @@ class TestActiveFlightsETLMethods(unittest.TestCase):
         result = pd.read_parquet(out_buffer)
 
         self.assertTrue(result.equals(source_exp))
+
+        self.s3_bucket.delete_objects(Delete={"Objects": [{"Key": key}]})
+
+
+class TestMetadataETLMethods(unittest.TestCase):
+    def set_default_metadata_monkey(self) -> None:
+        metadata = {
+            "icao24": ["a23456"],
+            "registration": ["ABCD-E"],
+            "manufacturericao": ["BOEING"],
+            "manufacturername": ["Boeing"],
+            "model": ["737 NG"],
+            "typecode": ["B737NG"],
+            "serialnumber": ["A-2345"],
+            "linenumber": ["CD567"],
+            "icaoaircrafttype": ["L1P"],
+            "operator": ["Test Air"],
+            "operatorcallsign": ["TEST AIR"],
+            "operatoricao": ["TAR"],
+            "operatoriata": ["TA"],
+            "owner": ["Test Lease"],
+            "testreg": ["T-AR"],
+            "registered": ["2001-03-02"],
+            "reguntil": ["2040-03-02"],
+            "status": [""],
+            "built": ["2000-10-05"],
+            "firstflightdate": ["2001-05-10"],
+            "seatconfiguration": [""],
+            "engines": ["CFM INTL. CFM56 SERIES"],
+            "modes": ["false"],
+            "adsb": ["true"],
+            "acars": ["false"],
+            "notes": ["test"],
+            "categoryDescription": ["Large"],
+        }
+        metadata_exp = pd.DataFrame(data=metadata)
+        self.opensky_client.get_aircraft_database = lambda: metadata_exp
+
+    def setUp(self) -> None:
+        self.mock = mock_aws()
+        self.mock.start()
+        s3_credentials = S3Sts(
+            REGION="us-east-2",
+            ROLE_ARN="arn:aws:iam::123456789012:role/TestRunner",
+            BUCKET="test-bucket",
+            ROLE_SESSION="TestRunner",
+        )
+        self.s3_endpoint_url = f"https://s3.{s3_credentials.REGION}.amazonaws.com"
+        self.s3_service_name = "sts"
+
+        self.s3 = boto3.resource("s3", endpoint_url=self.s3_endpoint_url)
+        self.s3.create_bucket(
+            Bucket=s3_credentials.BUCKET,
+            CreateBucketConfiguration={"LocationConstraint": s3_credentials.REGION},
+        )
+        self.s3_bucket = self.s3.Bucket(s3_credentials.BUCKET)
+        self.s3_bucket_connection = S3BucketConnector(credentials=s3_credentials)
+
+        opensky_auth = "test"
+        self.meta_filename = "test-meta"
+        self.opensky_client = OpenSkyClient(auth=opensky_auth)
+        self.set_default_metadata_monkey()
+        self.transformer = MetadataETL(
+            s3_bucket=self.s3_bucket_connection,
+            opensky_client=self.opensky_client,
+            meta_filename=self.meta_filename,
+        )
+
+    def tearDown(self) -> None:
+        self.mock.stop()
+
+    def test_extract_ok(self) -> None:
+        metadata_data = {
+            "icao24": ["a23456"],
+            "registration": ["ABCD-E"],
+            "manufacturericao": ["BOEING"],
+            "manufacturername": ["Boeing"],
+            "model": ["737 NG"],
+            "typecode": ["B737NG"],
+            "serialnumber": ["A-2345"],
+            "linenumber": ["CD567"],
+            "icaoaircrafttype": ["L1P"],
+            "operator": ["Test Air"],
+            "operatorcallsign": ["TEST AIR"],
+            "operatoricao": ["TAR"],
+            "operatoriata": ["TA"],
+            "owner": ["Test Lease"],
+            "testreg": ["T-AR"],
+            "registered": ["2001-03-02"],
+            "reguntil": ["2040-03-02"],
+            "status": [""],
+            "built": ["2000-10-05"],
+            "firstflightdate": ["2001-05-10"],
+            "seatconfiguration": [""],
+            "engines": ["CFM INTL. CFM56 SERIES"],
+            "modes": ["false"],
+            "adsb": ["true"],
+            "acars": ["false"],
+            "notes": ["test"],
+            "categoryDescription": ["Large"],
+        }
+        metadata_exp = pd.DataFrame(data=metadata_data)
+
+        metadata = self.transformer._extract()
+
+        self.assertTrue(metadata.equals(metadata_exp))
+
+    def test_transform_ok(self) -> None:
+        source = self.opensky_client.get_aircraft_database()
+        metadata_data_exp = {
+            "icao24": ["a23456"],
+            "registration": ["ABCD-E"],
+            "model": ["737 NG"],
+            "manufacturer_icao": ["BOEING"],
+            "owner": ["Test Lease"],
+            "operator": ["Test Air"],
+            "built": ["2000-10-05"],
+        }
+        metadata_exp = pd.DataFrame(data=metadata_data_exp)
+
+        metadata = self.transformer._transform(source_metadata=source)
+
+        self.assertTrue(metadata.equals(metadata_exp))
+
+    def test_load_ok(self) -> None:
+        key = f"{self.meta_filename}.parquet"
+        metadata_data_exp = {
+            "icao24": ["a23456"],
+            "registration": ["ABCD-E"],
+            "model": ["737 NG"],
+            "manufacturer_icao": ["BOEING"],
+            "owner": ["Test Lease"],
+            "operator": ["Test Air"],
+            "built": ["2000-10-05"],
+        }
+        metadata_exp = pd.DataFrame(data=metadata_data_exp)
+
+        self.transformer._load(metadata=metadata_exp)
+
+        data = self.s3_bucket.Object(key=key).get().get("Body").read()
+        out_buffer = BytesIO(data)
+        result = pd.read_parquet(out_buffer)
+
+        self.assertTrue(result.equals(metadata_exp))
 
         self.s3_bucket.delete_objects(Delete={"Objects": [{"Key": key}]})
 

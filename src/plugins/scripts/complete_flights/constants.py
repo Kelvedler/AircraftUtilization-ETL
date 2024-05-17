@@ -13,12 +13,6 @@ class CompleteFlightsColumns(NamedTuple):
     ICAO24: str = "icao24"
     FLIGHT_DURATION_MINUTES: str = "flight_duration_minutes"
     LANDED_AT: str = "landed_at"
-
-
-class CompleteFlightsColumnsV2(NamedTuple):
-    ICAO24: str = "icao24"
-    FLIGHT_DURATION_MINUTES: str = "flight_duration_minutes"
-    LANDED_AT: str = "landed_at"
     REGISTRATION: str = "registration"
     MODEL: str = "model"
     MANUFACTURER_ICAO: str = "manufacturer_icao"
@@ -48,7 +42,6 @@ class Mongodb(NamedTuple):
 
 
 COMPLETE_FLIGHTS_COLUMNS = CompleteFlightsColumns()
-COMPLETE_FLIGHTS_COLUMNS_V2 = CompleteFlightsColumnsV2()
 FLIGHT_STATUSES = FlightStatuses()
 FLIGHT_TRAJECTORIES = FlightTrajectories()
 FLIGHT_STATUS_COLUMN = "flight_status"
