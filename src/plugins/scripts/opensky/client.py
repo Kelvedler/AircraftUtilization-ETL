@@ -1,5 +1,6 @@
 import logging
 from typing import Union
+import pandas as pd
 
 import requests
 
@@ -11,12 +12,13 @@ class OpenSkyClient:
         if not isinstance(auth, str):
             raise InvalidCredentials("Opensky credentials are not valid")
         self._auth = auth
-        self._api_url = "http://opensky-network.org/api"
+        base_url = "http://opensky-network.org"
+        self._api_url = f"{base_url}/api"
+        self._metadata_url = f"{base_url}/datasets/metadata"
         self._logger = logging.getLogger(__name__)
 
     def get_states(self) -> dict:
-        states_path = "/states/all"
-        url = self._api_url + states_path
+        url = f"{self._api_url}/states/all"
         headers = {"Authorization": f"Basic {self._auth}"}
 
         self._logger.info("Fetching aircraft states")
@@ -31,3 +33,9 @@ class OpenSkyClient:
         raise InvalidResponseError(
             f"Failed to fetch states, status code: {response.status_code}"
         )
+
+    def get_aircraft_database(self) -> pd.DataFrame:
+        url = f"{self._metadata_url}/aircraftDatabase.csv"
+        self._logger.info("Fetching aircraft database")
+        df = pd.read_csv(url)
+        return df

@@ -3,14 +3,16 @@ import logging
 from typing import NamedTuple
 
 import pandas as pd
-
 from plugins.common.constants import (
     ACTIVE_FLIGHTS_COLUMNS,
+    META_COLUMNS,
+    META_FILENAME,
     SOURCE_COLUMNS,
     SOURCE_FILENAME,
 )
 from plugins.common.exceptions import InvalidResponseError, InvalidSource
 from plugins.common.s3 import S3BucketConnector
+from plugins.scripts.complete_flights.constants import COMPLETE_FLIGHTS_COLUMNS_V2
 from plugins.scripts.opensky.client import OpenSkyClient
 from plugins.scripts.opensky.constants import STATES_COLUMNS
 
@@ -67,9 +69,9 @@ class ActiveFlightsETL:
 
     def _update_flight_last_contact(self, source: pd.DataFrame) -> pd.DataFrame:
         valid_last_contact_mask = source[SOURCE_COLUMNS.LAST_CONTACT] != 0
-        source.loc[
-            valid_last_contact_mask, SOURCE_COLUMNS.FLIGHT_LAST_CONTACT
-        ] = source[SOURCE_COLUMNS.LAST_CONTACT]
+        source.loc[valid_last_contact_mask, SOURCE_COLUMNS.FLIGHT_LAST_CONTACT] = (
+            source[SOURCE_COLUMNS.LAST_CONTACT]
+        )
         return source
 
     def _define_first_contact(self, source: pd.DataFrame) -> pd.DataFrame:
@@ -99,7 +101,7 @@ class ActiveFlightsETL:
         return SourceReports(states=states, latest_source=latest_source)
 
     def _transform(self, source_reports: SourceReports) -> pd.DataFrame:
-        self._logger.info("Performing Opensky states transormation")
+        self._logger.info("Performing Opensky states transformation")
         active_flights = self._active_flights_from_source(
             source=source_reports.latest_source
         )
@@ -145,3 +147,47 @@ class ActiveFlightsETL:
         source_reports = self._extract()
         source = self._transform(source_reports=source_reports)
         self._load(source=source)
+
+
+class MetadataETL:
+    def __init__(
+        self, s3_bucket: S3BucketConnector, opensky_client: OpenSkyClient
+    ) -> None:
+        self._s3_bucket = s3_bucket
+        self._opensky_client = opensky_client
+        self._logger = logging.getLogger(__name__)
+
+    def _extract(self) -> pd.DataFrame:
+        self._logger.info("Extracting metadata")
+        source_metadata = self._opensky_client.get_aircraft_database()
+        return source_metadata
+
+    def _transform(self, source_metadata: pd.DataFrame) -> pd.DataFrame:
+        self._logger.info("Performing Opensky metadata transformation")
+        source_columns = META_COLUMNS
+        columns = COMPLETE_FLIGHTS_COLUMNS_V2
+        metadata = source_metadata[
+            [
+                META_COLUMNS.ICAO24,
+                META_COLUMNS.REGISTRATION,
+                META_COLUMNS.MODEL,
+                META_COLUMNS.MANUFACTURER_ICAO,
+                META_COLUMNS.OWNER,
+                META_COLUMNS.OPERATOR,
+                META_COLUMNS.BUILT,
+            ]
+        ]
+        metadata.rename(
+            columns={source_columns.MANUFACTURER_ICAO: columns.MANUFACTURER_ICAO},
+            inplace=True,
+        )
+        return metadata
+
+    def _load(self, metadata: pd.DataFrame) -> None:
+        self._logger.info("Uploading metadata")
+        self._s3_bucket.upload_to_parquet(df=metadata, filename=META_FILENAME)
+
+    def etl(self) -> None:
+        source_metadata = self._extract()
+        metadata = self._transform(source_metadata=source_metadata)
+        self._load(metadata=metadata)
