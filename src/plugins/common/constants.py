@@ -21,6 +21,16 @@ class SourceColumns(NamedTuple):
     IS_FIRST_CONTACT: str = "is_first_contact"
 
 
+class MetaColumns(NamedTuple):
+    ICAO24: str = "icao24"
+    REGISTRATION: str = "registration"
+    MODEL: str = "model"
+    MANUFACTURER_ICAO: str = "manufacturericao"
+    OWNER: str = "owner"
+    OPERATOR: str = "operator"
+    BUILT: str = "built"
+
+
 class ActiveFlightsColumns(NamedTuple):
     ICAO24: str = "icao24"
     TAKEOFF_AT: str = "takeoff_at"
@@ -47,7 +57,9 @@ class S3RolesAnywhere(NamedTuple):
 
 
 SOURCE_COLUMNS = SourceColumns()
-SOURCE_FILENAME = "source"
+SOURCE_FILENAME = os.getenv(key="SOURCE_FILENAME", default="source")
+META_COLUMNS = MetaColumns()
+META_FILENAME = os.getenv(key="META_FILENAME", default="metafile")
 ACTIVE_FLIGHTS_COLUMNS = ActiveFlightsColumns()
 S3_STS = S3Sts(
     REGION=os.getenv(key="S3_REGION", default=None),

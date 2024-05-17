@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   mongo:
     image: mongo:7.0.7-jammy
@@ -9,7 +8,7 @@ services:
       - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
-  potgres-etl:
+  postgres-etl:
     image: postgres:15.4-alpine3.18
     environment:
       - POSTGRES_DB=local_db

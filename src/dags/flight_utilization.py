@@ -10,14 +10,25 @@ from plugins.scripts.complete_flights.db import AircraftUtilizationClient
 from plugins.scripts.complete_flights.transformers import CompleteFlightsETL
 from plugins.scripts.opensky.client import OpenSkyClient
 from plugins.scripts.opensky.constants import OPENSKY_AUTH
-from plugins.scripts.opensky.transformers import ActiveFlightsETL
+from plugins.scripts.opensky.transformers import ActiveFlightsETL, MetadataETL
 
 
 logger = logging.getLogger(__name__)
 
 
+@task(retries=2, retry_delay=timedelta(minutes=5))
+def metadata_report() -> None:
+    logger.info("Starting Metadata ETL task")
+    s3_credentials = S3BucketConnector.get_credentials()
+    s3_bucket = S3BucketConnector(credentials=s3_credentials)
+    opensky_client = OpenSkyClient(auth=OPENSKY_AUTH)
+    transformer = MetadataETL(s3_bucket=s3_bucket, opensky_client=opensky_client)
+    transformer.etl()
+    logger.info("Metadata ETL task finished")
+
+
 @task(retries=2, retry_delay=timedelta(seconds=30))
-def active_flights_report():
+def active_flights_report() -> None:
     logger.info("Starting Active Flights ETL task")
     s3_credentials = S3BucketConnector.get_credentials()
     s3_bucket = S3BucketConnector(credentials=s3_credentials)
@@ -27,8 +38,8 @@ def active_flights_report():
     logger.info("Active Flights ETL task finished")
 
 
-@task()
-def complete_flights_report():
+@task(retries=1, retry_delay=timedelta(seconds=30))
+def complete_flights_report() -> None:
     logger.info("Starting Complete Flights ETL task")
     s3_credentials = S3BucketConnector.get_credentials()
     s3_bucket = S3BucketConnector(credentials=s3_credentials)
@@ -37,6 +48,14 @@ def complete_flights_report():
     transformer.etl()
     logger.info("Complete Flights ETL task finished")
 
+
+with DAG(
+    dag_id="metadata_etl",
+    start_date=datetime(2024, 1, 1),
+    schedule=timedelta(days=1),
+    catchup=False,
+) as dag:
+    metadata_report()
 
 with DAG(
     dag_id="adsb_etl",

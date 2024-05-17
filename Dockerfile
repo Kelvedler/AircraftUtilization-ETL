@@ -26,6 +26,4 @@ COPY ./src /app
 RUN chmod 744 docker-entrypoint.sh 
 RUN chmod 644 /etc/cron.d/airflow /etc/logrotate.d/airflow
 
-EXPOSE 8000
-
 ENTRYPOINT ./docker-entrypoint.sh

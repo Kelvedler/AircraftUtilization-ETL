@@ -2,15 +2,17 @@ import logging
 import math
 from typing import NamedTuple
 
+import numpy as np
 import pandas as pd
-
-from plugins.common.constants import SOURCE_COLUMNS, SOURCE_FILENAME
+from plugins.common.constants import META_FILENAME, SOURCE_COLUMNS, SOURCE_FILENAME
 from plugins.common.s3 import S3BucketConnector
 from plugins.scripts.complete_flights.constants import (
     COMPLETE_FLIGHTS_COLUMNS,
+    COMPLETE_FLIGHTS_COLUMNS_V2,
     FLIGHT_STATUSES,
     FLIGHT_STATUS_COLUMN,
     FLIGHT_TRAJECTORIES,
+    MONGODB,
 )
 from plugins.scripts.complete_flights.db import AircraftUtilizationClient
 
@@ -99,6 +101,14 @@ class CompleteFlightsETL:
         )
         return active
 
+    def _add_metadata(self, complete: pd.DataFrame) -> pd.DataFrame:
+        self._logger.info("Adding metadata to complete flights")
+        columns = COMPLETE_FLIGHTS_COLUMNS_V2
+        metadata = self.s3_bucket.read_parquet(filename=META_FILENAME)
+        complete = complete.merge(right=metadata, on=columns.ICAO24, how="left")
+        complete = complete.replace({np.nan: None})
+        return complete
+
     def _transform_complete(self, complete: pd.DataFrame) -> pd.DataFrame:
         valid_mask = complete[SOURCE_COLUMNS.TAKEOFF_AT] != 0
         complete = complete.loc[
@@ -126,6 +136,8 @@ class CompleteFlightsETL:
             axis=1,
             inplace=True,
         )
+        if MONGODB.DB == "aircraft-utilization-main":
+            complete = self._add_metadata(complete=complete)
         return complete
 
     def _transform(self, source: pd.DataFrame) -> TransformedFlights:
@@ -145,7 +157,10 @@ class CompleteFlightsETL:
     def _load(self, flights: TransformedFlights) -> None:
         self._logger.info("Uploading reports")
         self.s3_bucket.upload_to_parquet(df=flights.active, filename=SOURCE_FILENAME)
-        self.db_client.write_flights(df=flights.complete)
+        if MONGODB.DB == "aircraft-utilization-main":
+            self.db_client.write_flights_v2(df=flights.complete)
+        else:
+            self.db_client.write_flights(df=flights.complete)
 
     def etl(self) -> None:
         source = self._extract()
