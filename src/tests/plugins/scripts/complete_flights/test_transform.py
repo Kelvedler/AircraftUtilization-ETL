@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from io import BytesIO
 import unittest
 
@@ -362,7 +362,7 @@ class TestCompleteFlightsETLMethods(unittest.TestCase):
             "manufacturer_icao": ["BOEING", "AIRBUS"],
             "owner": ["Test Lease", "New Test Lease"],
             "operator": ["Test Air", "New Test Air"],
-            "built": [date(year=2000, month=2, day=1), date(year=1990, month=3, day=5)],
+            "built": ["2000-02-01", "1990-03-05"],
         }
         metadata = pd.DataFrame(data=metadata_data)
         complte = pd.DataFrame(data=data)
@@ -375,12 +375,15 @@ class TestCompleteFlightsETLMethods(unittest.TestCase):
             "manufacturer_icao": "BOEING",
             "owner": "Test Lease",
             "operator": "Test Air",
-            "built": date(year=2000, month=2, day=1),
+            "built": "2000-02-01 00:00:00",
         }
         result_exp = pd.DataFrame(data=data_exp)
         result_exp["landed_at"] = pd.to_datetime(
             result_exp["landed_at"], unit="s", utc=True
         )
+        result_exp["built"] = pd.to_datetime(
+            result_exp["built"],
+        ).astype(object)
 
         result = self.transformer._transform_complete(
             complete=complte, metadata=metadata
