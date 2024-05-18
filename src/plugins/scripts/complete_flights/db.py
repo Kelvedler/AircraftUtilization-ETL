@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 from typing import Optional, TypedDict
 
@@ -22,7 +23,7 @@ class Flights(TypedDict):
     manufacturer_icao: Optional[str]
     owner: Optional[str]
     operator: Optional[str]
-    built: Optional[str]
+    built: Optional[datetime]
 
 
 class AircraftUtilizationClient:

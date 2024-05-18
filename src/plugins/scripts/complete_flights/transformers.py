@@ -112,6 +112,12 @@ class CompleteFlightsETL:
         columns = COMPLETE_FLIGHTS_COLUMNS
         complete = complete.merge(right=metadata, on=columns.ICAO24, how="left")
         complete = complete.replace({np.nan: None})
+
+        built_not_null = complete[columns.BUILT].isnull() == False
+        complete.loc[built_not_null, columns.BUILT] = pd.to_datetime(
+            complete.loc[built_not_null, columns.BUILT],
+            format="%Y-%m-%d",
+        )
         return complete
 
     def _transform_complete(
