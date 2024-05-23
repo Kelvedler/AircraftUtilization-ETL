@@ -23,6 +23,13 @@ RUN pip install -r ./requirements.txt --constraint ./constraints.txt
 
 COPY ./src /app
 
+COPY ./requirements-test.txt /app/requirements-test.txt
+RUN pip install -r ./requirements-test.txt --constraint ./constraints.txt
+RUN python -m unittest
+RUN pip uninstall -r /app/requirements-test.txt -y
+RUN rm /app/requirements-test.txt
+RUN rm -r /app/tests
+
 RUN chmod 744 docker-entrypoint.sh 
 RUN chmod 644 /etc/cron.d/airflow /etc/logrotate.d/airflow
 

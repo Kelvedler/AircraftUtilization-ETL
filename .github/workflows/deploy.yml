@@ -14,24 +14,8 @@ jobs:
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
         id: extract_branch
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ vars.PYTHON_VERSION }}
-          architecture: "x64"
-
       - name: Checkout repo
         uses: actions/checkout@v2
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip 
-          pip install -r requirements.txt --constraint constraints.txt
-          pip install -r requirements-test.txt --constraint constraints.txt
-
-      - name: Test with unittest
-        run: |
-          (cd src && python -m unittest)
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v2
